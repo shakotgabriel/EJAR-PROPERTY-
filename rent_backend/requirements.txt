@@ -1,11 +1,11 @@
 Django==5.2.9
 djangorestframework==3.16.1
 djangorestframework-simplejwt==5.5.1
-django-filter==25.2
 django-cors-headers==4.9.0
+django-filter==25.2
+psycopg2-binary==2.9.11
 gunicorn==25.0.3
-psycopg2-binary>=2.9
+aiobotocore==2.5.4
 aiohttp==3.13.3
 aioitertools==0.11.0
-aiobotocore==2.5.4
-
+python-dotenv==1.0.1  # Add this line
