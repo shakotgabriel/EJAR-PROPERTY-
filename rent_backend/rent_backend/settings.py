@@ -110,7 +110,22 @@ USE_TZ = True
 STATIC_URL = "static/"
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-_cors_origins = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
-CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(",") if o.strip()]
+_cors_origins = os.getenv("CORS_ALLOWED_ORIGINS")
+if _cors_origins:
+    CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(",") if o.strip()]
+else:
+    # Sensible defaults for local dev + production frontend.
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        FRONTEND_URL,
+        "https://ejarproperties.netlify.app",
+    ]
+
+# Netlify deploy previews use randomized subdomains like:
+# https://<hash>--ejarproperties.netlify.app
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*--ejarproperties\\.netlify\\.app$",
+]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
