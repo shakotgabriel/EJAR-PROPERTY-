@@ -4,7 +4,7 @@ import axios, { type AxiosRequestConfig } from "axios"
 const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL as string | undefined)
 
 const API = axios.create({
-  baseURL: (API_BASE_URL ?? "http://127.0.0.1:8000/api/").replace(/\/+$/, "") + "/",
+  baseURL: (API_BASE_URL ?? "https://ejar-property.onrender.com/api/").replace(/\/+$/, "") + "/",
   headers: { Accept: "application/json" },
 })
 
