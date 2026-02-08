@@ -41,7 +41,7 @@ const AUTH_ENDPOINTS = [
 
 const normalizeUrl = (url?: string) => {
   if (!url) return ""
-  // Axios may store relative paths (e.g. 'users/me/') or absolute URLs.
+
   return url.replace(/^https?:\/\/[^/]+\//i, "").replace(/^\/+/, "")
 }
 
@@ -89,7 +89,6 @@ export const attachAuthInterceptors = (callbacks: AuthInterceptorCallbacks) => {
         return Promise.reject(error)
       }
 
-      // Never try to refresh for auth endpoints (especially refresh itself), or we risk loops.
       if (isAuthEndpoint(originalRequest.url)) {
         return Promise.reject(error)
       }
