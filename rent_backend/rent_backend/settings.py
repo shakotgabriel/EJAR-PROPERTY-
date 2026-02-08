@@ -10,7 +10,7 @@ def _env_bool(name: str, default: bool = False) -> bool:
         return default
     return value.strip().lower() in {"1", "true", "yes", "y", "on"}
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "change-me")
-DEBUG = _env_bool("DJANGO_DEBUG", True)
+DEBUG = _env_bool("DJANGO_DEBUG", False)
 _allowed_hosts = os.getenv("DJANGO_ALLOWED_HOSTS", "*")
 ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts.split(",") if h.strip()]
 AUTH_USER_MODEL = 'users.User'
@@ -84,15 +84,65 @@ TEMPLATES = [
 ]
 WSGI_APPLICATION = "rent_backend.wsgi.application"
 DATABASES = {
-    "default": {
+    "default": {}
+}
+
+# Render (and many other hosts) commonly provide a single DATABASE_URL.
+# If neither DATABASE_URL nor the DB_* vars are set, fall back to local sqlite.
+from urllib.parse import urlparse, parse_qs  # noqa: E402
+
+_database_url = os.getenv("DATABASE_URL")
+_db_name = os.getenv("DB_NAME")
+_db_user = os.getenv("DB_USER")
+
+if _database_url:
+    _u = urlparse(_database_url)
+    _scheme = (_u.scheme or "").lower()
+
+    if _scheme in {"postgres", "postgresql"}:
+        _query = parse_qs(_u.query)
+        DATABASES["default"] = {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": (_u.path or "").lstrip("/"),
+            "USER": _u.username,
+            "PASSWORD": _u.password,
+            "HOST": _u.hostname,
+            "PORT": _u.port or 5432,
+        }
+        # Preserve common SSL options like ?sslmode=require
+        if "sslmode" in _query:
+            DATABASES["default"].setdefault("OPTIONS", {})
+            DATABASES["default"]["OPTIONS"]["sslmode"] = _query["sslmode"][0]
+    elif _scheme == "sqlite":
+        db_path = (_u.path or "").lstrip("/")
+        DATABASES["default"] = {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": db_path or (BASE_DIR / "db.sqlite3"),
+        }
+    else:
+        # Unknown scheme; keep Django's normal error path.
+        DATABASES["default"] = {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("DB_NAME"),
+            "USER": os.getenv("DB_USER"),
+            "PASSWORD": os.getenv("DB_PASSWORD"),
+            "HOST": os.getenv("DB_HOST"),
+            "PORT": os.getenv("DB_PORT", 5432),
+        }
+elif _db_name and _db_user:
+    DATABASES["default"] = {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("DB_NAME"),
-        "USER": os.getenv("DB_USER"),
+        "NAME": _db_name,
+        "USER": _db_user,
         "PASSWORD": os.getenv("DB_PASSWORD"),
         "HOST": os.getenv("DB_HOST"),
-        "PORT": os.getenv("DB_PORT", 5432),
+        "PORT": int(os.getenv("DB_PORT", "5432")),
     }
-}
+else:
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {

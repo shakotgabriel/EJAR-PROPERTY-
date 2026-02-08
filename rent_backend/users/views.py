@@ -20,6 +20,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 import logging
 from django.db import transaction
+import uuid
 from .verification import create_and_send_code, mask_destination, get_verification_config
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -58,54 +59,48 @@ class LoginView(generics.GenericAPIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "login"
     def post(self, request):
+        request_id = str(uuid.uuid4())
         try:
             serializer = self.get_serializer(data=request.data)
-            if not serializer.is_valid():
+            serializer.is_valid(raise_exception=True)
+
+            email = (serializer.validated_data["email"] or "").strip().lower()
+            password = serializer.validated_data["password"]
+
+            user = User.objects.filter(email__iexact=email).order_by("id").first()
+            if not user:
+                return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+            if not user.is_active:
+                return Response({"detail": "Account is inactive"}, status=status.HTTP_403_FORBIDDEN)
+            if not user.check_password(password):
+                return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+            if not user.is_verified:
                 return Response(
-                    {'detail': 'Invalid input', 'errors': serializer.errors},
-                    status=status.HTTP_400_BAD_REQUEST
+                    {
+                        "detail": "Account not verified.",
+                        "verification_required": True,
+                        "email": user.email,
+                        "phone_number": user.phone_number,
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
                 )
-            email = serializer.validated_data['email']
-            password = serializer.validated_data['password']
-            try:
-                user = User.objects.get(email=email)
-                if not user.is_active:
-                    return Response(
-                        {'detail': 'Account is inactive'},
-                        status=status.HTTP_403_FORBIDDEN
-                    )
-                if not user.check_password(password):
-                    return Response(
-                        {'detail': 'Invalid credentials'},
-                        status=status.HTTP_401_UNAUTHORIZED
-                    )
-                if not user.is_verified:
-                    return Response(
-                        {
-                            "detail": "Account not verified.",
-                            "verification_required": True,
-                            "email": user.email,
-                            "phone_number": user.phone_number,
-                        },
-                        status=status.HTTP_403_FORBIDDEN,
-                    )
-                refresh = RefreshToken.for_user(user)
-                return Response({
-                    'refresh': str(refresh),
-                    'access': str(refresh.access_token),
-                    'user': UserSerializer(user).data
-                }, status=status.HTTP_200_OK)
-            except User.DoesNotExist:
-                return Response(
-                    {'detail': 'Invalid credentials'},
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
-        except Exception as e:
-            logger.exception("Login error")
+
+            refresh = RefreshToken.for_user(user)
             return Response(
-                {'detail': 'An error occurred during login'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {
+                    "refresh": str(refresh),
+                    "access": str(refresh.access_token),
+                    "user": UserSerializer(user).data,
+                },
+                status=status.HTTP_200_OK,
             )
+        except Exception:
+            logger.exception("Login error (request_id=%s)", request_id)
+            payload = {"detail": "An error occurred during login", "request_id": request_id}
+            if getattr(settings, "DEBUG", False):
+                # In DEBUG, Django/DRF will already show more detail; this keeps API clients readable.
+                payload["debug"] = "Check server logs for stack trace"
+            return Response(payload, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 class LogoutView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     def post(self, request):
