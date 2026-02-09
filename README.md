@@ -98,6 +98,15 @@ Base path: `/api/`
 - `/api/messages/` — conversations + messages
 - `/api/notifications/` — notifications + preferences
 
+
+login crednetials
+
+mary.kuol@juba.example
+admin1@ejar.local
+peter.gatluak@juba.example
+
+These all use the same passwsord Password123!
+
 ## Notes
 
 - File uploads are stored under `rent_backend/media/` and are served only when `DJANGO_DEBUG=1`.
